@@ -1,0 +1,68 @@
+# Robot model selection and initial parameters.
+# Every numerical base value below is a proposed starting value and NEEDS TUNING.
+base_type: wheeled  # Select: wheeled | virtual
+
+simulation:
+  timestep: 0.002       # needs tuning
+  gravity: [0.0, 0.0, -9.81]  # needs tuning
+  integrator: implicitfast
+  ground_friction: [1.0, 0.01, 0.001]  # needs tuning
+  key_light_position: [0.0, -1.0, 3.0]  # visual parameter; needs tuning
+  key_light_direction: [0.0, 0.0, -1.0]
+
+panda_home:
+  # Reference configuration copied from the original Menagerie Panda home keyframe.
+  arm_joints:
+    joint1: 0.0
+    joint2: 0.0
+    joint3: 0.0
+    joint4: -1.57079
+    joint5: 0.0
+    joint6: 1.57079
+    joint7: -0.78530
+  finger_positions: [0.04, 0.04]
+  gripper_actuator_command: 255.0
+
+base:
+  initial_pose_xyyaw: [0.0, 0.0, 0.0]  # needs tuning; metres, metres, radians
+  chassis_mass: 40.0  # kg; needs tuning
+  chassis_half_size: [0.34, 0.28, 0.10]  # m; needs tuning
+  panda_mount_position: [-0.10, 0.0, 0.10]  # m relative to chassis; needs tuning
+  panda_gravity_compensation: 1.0  # needs tuning; 1.0 is full compensation
+
+  wheeled:
+    wheel_radius: 0.10       # m; needs tuning
+    wheel_separation: 0.62   # m, distance between wheel centres; needs tuning
+    wheel_width: 0.06        # m; needs tuning
+    wheel_mass: 1.5          # kg per wheel; needs tuning
+    wheel_joint_damping: 0.10  # needs tuning
+    wheel_joint_armature: 0.01 # needs tuning
+    wheel_friction: [1.5, 0.02, 0.001]  # needs tuning
+    wheel_speed_limit: 8.0   # rad/s; needs tuning
+    wheel_torque_limit: 5.0  # N*m; needs tuning
+    wheel_velocity_gain: 10.0  # needs tuning
+    caster_radius: 0.05     # m; needs tuning
+    caster_mass: 0.30       # kg per caster; needs tuning
+    caster_x_offset: 0.24   # m; needs tuning
+    caster_joint_damping: 0.02  # needs tuning
+    caster_friction: [0.05, 0.005, 0.0005]  # needs tuning
+
+  virtual:
+    x_range: [-4.0, 4.0]       # m; needs tuning
+    y_range: [-3.0, 3.0]       # m; needs tuning
+    yaw_range: [-6.283185, 6.283185]  # rad; needs tuning
+    position_kp: 200.0         # needs tuning
+    position_kv: 30.0          # needs tuning
+    position_force_limit: 500.0  # N; needs tuning
+    yaw_kp: 200.0              # needs tuning
+    yaw_kv: 30.0               # needs tuning
+    yaw_torque_limit: 200.0    # N*m; needs tuning
+    support_radius: 0.05      # m, low-friction support spheres; needs tuning
+    support_mass: 0.01        # kg per support sphere; needs tuning
+    support_x_offset: 0.24    # m; needs tuning
+    support_y_offset: 0.18    # m; needs tuning
+    support_friction: [0.05, 0.005, 0.0005]  # needs tuning
+
+validation:
+  simulation_steps: 500  # smoke-test steps; needs tuning
+  viewer_sync_period_s: 0.02  # seconds; needs tuning
