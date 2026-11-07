@@ -23,3 +23,8 @@ dependencies = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: marks tests that require MuJoCo and physics (deselect with -m 'not integration')",
+]
