@@ -28,7 +28,7 @@ import mujoco
 import numpy as np
 import yaml
 
-from library_robot.sim.mobile_model import load_mobile_robot_model
+from library_robot.sim.mobile_model import load_mobile_robot_model, initialize_mobile_robot, _load_config
 
 # ---------------------------------------------------------------------------
 # Arm body names: try panda_ prefix first, then bare Menagerie names
@@ -96,18 +96,28 @@ def _measure_vertical_contact_force(model: mujoco.MjModel, data: mujoco.MjData) 
         mujoco.mj_contactForce(model, data, i, f_arr)
         frame = np.array(c.frame).reshape(3, 3)
         world_force = frame.T @ f_arr[:3]
-        total_z += world_force[2]
+        if c.geom1 == ground_id:
+            total_z += world_force[2]
+        else:
+            total_z -= world_force[2]
     return float(total_z)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "configs" / "wheeled_validation.yaml"
+ROBOT_CONFIG_FILE = REPO_ROOT / "configs" / "robot.yaml"
 
 if CONFIG_PATH.exists():
     with CONFIG_PATH.open("r", encoding="utf-8") as f:
         CONFIG = yaml.safe_load(f)
 else:
     CONFIG = {}
+
+if ROBOT_CONFIG_FILE.exists():
+    with ROBOT_CONFIG_FILE.open("r", encoding="utf-8") as f:
+        ROBOT_CONFIG = yaml.safe_load(f)
+else:
+    ROBOT_CONFIG = {}
 
 
 def get_cfg(section: str, key: str, default: Any) -> Any:
@@ -133,14 +143,14 @@ def print_gravcomp_status(model: mujoco.MjModel, data: mujoco.MjData, label: str
     print(f"  Total robot mass (base+arm): {total_mass:.4f} kg")
     print(f"  Expected weight:             {expected_N:.4f} N")
 
-    # Settle 100 steps then measure contact forces
-    for _ in range(100):
+    # Settle 500 steps (1.0 s) then measure contact forces at rest
+    for _ in range(500):
         mujoco.mj_step(model, data)
     contact_z = _measure_vertical_contact_force(model, data)
     discrepancy = expected_N - contact_z
-    flag = " <<< |delta| > 1 N" if abs(discrepancy) > 1.0 else ""
-    print(f"  Vertical contact force (after 100 steps): {contact_z:.4f} N")
-    print(f"  Discrepancy (expected - measured):        {discrepancy:.4f} N{flag}")
+    flag = " <<< |delta| > 1 N" if abs(discrepancy) > 1.0 else " [MATCH]"
+    print(f"  Vertical contact force (settled 1.0 s):   {contact_z:.4f} N")
+    print(f"  Discrepancy (expected - measured):        {discrepancy:+.4f} N{flag}")
     print(f"--- End Gravcomp Status [{label}] ---\n")
 
 
@@ -198,17 +208,12 @@ def setup_fresh_model() -> Tuple[mujoco.MjModel, mujoco.MjData, int, int, int, i
 
     # Apply arm gravity compensation flag if present
     arm_gravcomp = get_cfg("validation", "arm_gravcomp", False)
-    if not arm_gravcomp:
-        arm_body_names = [
-            "panda_link0", "panda_link1", "panda_link2", "panda_link3",
-            "panda_link4", "panda_link5", "panda_link6", "panda_hand",
-            "right_finger", "left_finger",
-        ]
-        for name in arm_body_names:
-            bid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, name)
-            if bid >= 0:
-                model.body_gravcomp[bid] = 0.0
-        mujoco.mj_setConst(model, data)
+    grav_val = 1.0 if arm_gravcomp else 0.0
+    for name, bid in _discover_arm_bodies(model):
+        model.body_gravcomp[bid] = grav_val
+    mujoco.mj_setConst(model, data)
+    # mj_setConst resets data.qpos to 0. Re-initialize pose and actuators properly:
+    initialize_mobile_robot(model, data, "wheeled", ROBOT_CONFIG)
 
     if any(idx < 0 for idx in [left_act, right_act, left_wheel_geom, right_wheel_geom, ground_geom]):
         raise RuntimeError("Missing required actuator or geom in wheeled model")
@@ -716,15 +721,27 @@ def test_stress_tip_test() -> Dict[str, Any]:
     print(f"  CoM height estimate (subtree_com):    {com_height:.4f} m")
     print(f"  Tipping accel (g * caster_x / h):    {tip_accel:.4f} m/s^2")
 
-    # Print accel time series table (braking phase)
-    print(f"\n  --- Braking-Phase Acceleration Time Series ({len(accel_timeseries)} steps) ---")
-    print(f"  {'Step':>5}  {'Time(s)':>8}  {'Accel(m/s^2)':>13}  {'Torque_L(Nm)':>13}  {'Torque_R(Nm)':>13}")
-    for row in accel_timeseries:
-        print(f"  {row['step']:>5}  {row['sim_time_s']:>8.4f}  {row['chassis_accel_mps2']:>13.4f}  {row['torque_left_Nm']:>13.4f}  {row['torque_right_Nm']:>13.4f}")
+    # Print accel time series window around the peak (at least 60 steps)
+    if accel_timeseries:
+        peak_idx = max(range(len(accel_timeseries)), key=lambda i: accel_timeseries[i]["chassis_accel_mps2"])
+        start_idx = max(0, peak_idx - 30)
+        end_idx = min(len(accel_timeseries), peak_idx + 35)
+        window_rows = accel_timeseries[start_idx:end_idx]
 
-    # Identify spike vs sustained
-    high_accel_steps = sum(1 for r in accel_timeseries if r["chassis_accel_mps2"] > 1.0)
-    print(f"\n  Steps with accel > 1.0 m/s^2: {high_accel_steps} out of {len(accel_timeseries)}")
+        print(f"\n  --- Acceleration Time Series ({len(window_rows)} steps around peak at step {accel_timeseries[peak_idx]['step']}) ---")
+        print(f"  {'Step':>5}  {'Time(s)':>8}  {'Accel(m/s^2)':>13}  {'Torque_L(Nm)':>13}  {'Torque_R(Nm)':>13}")
+        for row in window_rows:
+            marker = " <-- PEAK" if row["step"] == accel_timeseries[peak_idx]["step"] else ""
+            print(f"  {row['step']:>5}  {row['sim_time_s']:>8.4f}  {row['chassis_accel_mps2']:>13.4f}  {row['torque_left_Nm']:>13.4f}  {row['torque_right_Nm']:>13.4f}{marker}")
+
+        # Impulse vs sustained classification
+        high_accel_steps = sum(1 for r in accel_timeseries if r["chassis_accel_mps2"] > 1.0)
+        high_accel_duration_s = high_accel_steps * dt
+        print(f"\n  Steps with accel > 1.0 m/s^2: {high_accel_steps} ({high_accel_duration_s:.4f} s) out of {len(accel_timeseries)} total braking steps")
+        if high_accel_steps <= 5:
+            print("  Impulse analysis: Acceleration peak is a transient IMPULSE (duration <= 5 steps / 0.010 s) from braking contact jerk.")
+        else:
+            print(f"  Impulse analysis: Acceleration is sustained across {high_accel_steps} steps ({high_accel_duration_s:.3f} s).")
 
     # Save accel time series CSV
     results_dir = REPO_ROOT / "results"
@@ -771,15 +788,15 @@ def test_joint_sag_extended(payload_mass: float = 2.0) -> None:
     mujoco.mj_setConst(model, data)
     print(f"  Payload body: hand (id={hand_id}), mass after += {payload_mass} kg = {float(model.body_mass[hand_id]):.4f} kg")
 
-    # Extended pose targets
+    # Extended pose targets (matches Test D/E extended reaching posture)
     extended_joints = {
         "joint1": 0.0,
-        "joint2": -0.3,
+        "joint2": 0.85,
         "joint3": 0.0,
-        "joint4": -2.0,
+        "joint4": -0.30,
         "joint5": 0.0,
-        "joint6": 1.9,
-        "joint7": 0.785,
+        "joint6": 1.05,
+        "joint7": 0.0,
     }
 
     # Command arm to extended pose
@@ -822,25 +839,32 @@ def main():
     # 1. Tip margin analysis
     print("\n--- Static Centre of Mass & Tip Margin Analysis ---")
     m_base, d_base, _, _, _, _, _ = setup_fresh_model()
-    settle_robot(m_base, d_base, 0.10)
+    settle_robot(m_base, d_base, 1.0)
     margin_retracted = compute_tip_margin(m_base, d_base)
-    print(f"  Retracted Arm (Panda Home, 0 kg payload):")
+    print(f"  Retracted Arm (Panda Home, 0 kg payload, settled 1.0 s):")
     print(f"    Combined CoM in chassis frame: X={margin_retracted['com_x_m']:.4f} m, Y={margin_retracted['com_y_m']:.4f} m, Z={margin_retracted['com_z_m']:.4f} m")
     print(f"    Distance to Front-Left / Front-Right edges: {margin_retracted['dist_front_left_m']:.4f} m / {margin_retracted['dist_front_right_m']:.4f} m")
     print(f"    Minimum Tip Margin to Polygon Edge:        {margin_retracted['min_tip_margin_m']:.4f} m ({margin_retracted['min_tip_margin_m'] * 100.0:.2f} cm)")
 
-    m_ext, d_ext, _, _, _, _, _ = setup_fresh_model()
+    m_ext, d_ext, l_act, r_act, _, _, _ = setup_fresh_model()
     hand_id = mujoco.mj_name2id(m_ext, mujoco.mjtObj.mjOBJ_BODY, "hand")
     m_ext.body_mass[hand_id] += 2.0  # 2 kg payload
     mujoco.mj_setConst(m_ext, d_ext)
     extended_joints = {"joint1": 0.0, "joint2": 0.85, "joint3": 0.0, "joint4": -0.30, "joint5": 0.0, "joint6": 1.05, "joint7": 0.0}
     for j_name, target_pos in extended_joints.items():
         j_id = mujoco.mj_name2id(m_ext, mujoco.mjtObj.mjOBJ_JOINT, j_name)
-        d_ext.qpos[m_ext.jnt_qposadr[j_id]] = target_pos
+        if j_id >= 0:
+            d_ext.qpos[m_ext.jnt_qposadr[j_id]] = target_pos
+            act_num = j_name.replace("joint", "")
+            act_id = mujoco.mj_name2id(m_ext, mujoco.mjtObj.mjOBJ_ACTUATOR, f"actuator{act_num}")
+            if act_id >= 0:
+                d_ext.ctrl[act_id] = target_pos
+    d_ext.ctrl[l_act] = 0.0
+    d_ext.ctrl[r_act] = 0.0
     mujoco.mj_forward(m_ext, d_ext)
-    settle_robot(m_ext, d_ext, 0.10)
+    settle_robot(m_ext, d_ext, 1.0)
     margin_extended = compute_tip_margin(m_ext, d_ext)
-    print(f"  Fully Extended Arm + 2.0 kg Payload:")
+    print(f"  Fully Extended Arm + 2.0 kg Payload (arm servos active, settled 1.0 s):")
     print(f"    Combined CoM in chassis frame: X={margin_extended['com_x_m']:.4f} m, Y={margin_extended['com_y_m']:.4f} m, Z={margin_extended['com_z_m']:.4f} m")
     print(f"    Distance to Front-Left / Front-Right edges: {margin_extended['dist_front_left_m']:.4f} m / {margin_extended['dist_front_right_m']:.4f} m")
     print(f"    Minimum Tip Margin to Polygon Edge:        {margin_extended['min_tip_margin_m']:.4f} m ({margin_extended['min_tip_margin_m'] * 100.0:.2f} cm)")

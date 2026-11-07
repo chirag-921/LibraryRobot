@@ -196,7 +196,8 @@ def _add_wheeled_base(
 
     panda_mount = list(map(float, base["panda_mount_position"]))
     panda_root.set("pos", _fmt(panda_mount))
-    _apply_panda_gravcomp(panda_root, float(base["panda_gravity_compensation"]))
+    gravcomp_val = float(base.get("panda_gravity_compensation", 0.0))
+    _apply_panda_gravcomp(panda_root, gravcomp_val)
     chassis.append(panda_root)
 
 
@@ -284,7 +285,8 @@ def _add_virtual_base(
         )
     panda_mount = list(map(float, base["panda_mount_position"]))
     panda_root.set("pos", _fmt(panda_mount))
-    _apply_panda_gravcomp(panda_root, float(base["panda_gravity_compensation"]))
+    gravcomp_val = float(base.get("panda_gravity_compensation", 0.0))
+    _apply_panda_gravcomp(panda_root, gravcomp_val)
     chassis.append(panda_root)
 
     for name, joint, kp, kv, ctrlrange, forcerange in (
