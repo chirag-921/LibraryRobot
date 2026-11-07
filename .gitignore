@@ -5,3 +5,4 @@ assets/mujoco_menagerie/
 LibraryRobot/assets/mujoco_menagerie/
 *.egg-info/
 logs/
+results/
