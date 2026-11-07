@@ -1,0 +1,101 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mujoco model="library_scene">
+  <compiler angle="radian" autolimits="true" />
+  <option integrator="implicitfast" timestep="0.002" gravity="0 0 -9.81" />
+  <visual>
+    <global offwidth="1920" offheight="1080" />
+  </visual>
+  <worldbody>
+    <geom name="ground" type="plane" pos="0 0 0" size="5 5 0.05" rgba="0.85 0.87 0.88 1" friction="1 0.01 0.001" />
+    <geom name="wall_north" type="box" pos="0 4.05 1.25" size="4.1 0.05 1.25" rgba="0.92 0.93 0.94 1" contype="1" conaffinity="1" />
+    <geom name="wall_south" type="box" pos="0 -4.05 1.25" size="4.1 0.05 1.25" rgba="0.92 0.93 0.94 1" contype="1" conaffinity="1" />
+    <geom name="wall_east" type="box" pos="4.05 0 1.25" size="0.05 4 1.25" rgba="0.92 0.93 0.94 1" contype="1" conaffinity="1" />
+    <geom name="wall_west" type="box" pos="-4.05 0 1.25" size="0.05 4 1.25" rgba="0.92 0.93 0.94 1" contype="1" conaffinity="1" />
+    <geom name="landmark_window" type="box" pos="3.95 3.65 1.6" size="0.025 0.6 0.4" rgba="0.5 0.8 0.95 0.7" contype="0" conaffinity="0" />
+    <light name="ceiling_light_center" pos="0 0 3.5" dir="0 0 -1" diffuse="0.8 0.8 0.8" />
+    <light name="ceiling_light_north" pos="0 2.5 3.5" dir="0 0 -1" diffuse="0.6 0.6 0.6" />
+    <light name="ceiling_light_south" pos="0 -2.5 3.5" dir="0 0 -1" diffuse="0.6 0.6 0.6" />
+    <body name="table_a" pos="-2.2 1.8 0">
+      <geom name="table_a_top" type="box" pos="0 0 0.53" size="0.5 0.2 0.02" rgba="0.75 0.58 0.42 1" contype="1" conaffinity="1" friction="1 0.01 0.001" />
+      <geom name="table_a_pedestal" type="box" pos="0 0 0.265" size="0.4 0.14 0.265" rgba="0.30 0.32 0.35 1" contype="1" conaffinity="1" friction="1 0.01 0.001" />
+    </body>
+    <body name="table_b" pos="0 1.5 0">
+      <geom name="table_b_top" type="box" pos="0 0 0.53" size="0.5 0.2 0.02" rgba="0.75 0.58 0.42 1" contype="1" conaffinity="1" friction="1 0.01 0.001" />
+      <geom name="table_b_pedestal" type="box" pos="0 0 0.265" size="0.4 0.14 0.265" rgba="0.30 0.32 0.35 1" contype="1" conaffinity="1" friction="1 0.01 0.001" />
+    </body>
+    <body name="table_c" pos="2.2 1.8 0">
+      <geom name="table_c_top" type="box" pos="0 0 0.53" size="0.5 0.2 0.02" rgba="0.75 0.58 0.42 1" contype="1" conaffinity="1" friction="1 0.01 0.001" />
+      <geom name="table_c_pedestal" type="box" pos="0 0 0.265" size="0.4 0.14 0.265" rgba="0.30 0.32 0.35 1" contype="1" conaffinity="1" friction="1 0.01 0.001" />
+    </body>
+    <body name="table_d" pos="-2.2 -1.5 0">
+      <geom name="table_d_top" type="box" pos="0 0 0.53" size="0.5 0.2 0.02" rgba="0.75 0.58 0.42 1" contype="1" conaffinity="1" friction="1 0.01 0.001" />
+      <geom name="table_d_pedestal" type="box" pos="0 0 0.265" size="0.4 0.14 0.265" rgba="0.30 0.32 0.35 1" contype="1" conaffinity="1" friction="1 0.01 0.001" />
+    </body>
+    <body name="table_e" pos="0 -1.5 0">
+      <geom name="table_e_top" type="box" pos="0 0 0.53" size="0.5 0.2 0.02" rgba="0.75 0.58 0.42 1" contype="1" conaffinity="1" friction="1 0.01 0.001" />
+      <geom name="table_e_pedestal" type="box" pos="0 0 0.265" size="0.4 0.14 0.265" rgba="0.30 0.32 0.35 1" contype="1" conaffinity="1" friction="1 0.01 0.001" />
+    </body>
+    <body name="table_f" pos="2.2 -1.5 0">
+      <geom name="table_f_top" type="box" pos="0 0 0.53" size="0.5 0.2 0.02" rgba="0.75 0.58 0.42 1" contype="1" conaffinity="1" friction="1 0.01 0.001" />
+      <geom name="table_f_pedestal" type="box" pos="0 0 0.265" size="0.4 0.14 0.265" rgba="0.30 0.32 0.35 1" contype="1" conaffinity="1" friction="1 0.01 0.001" />
+    </body>
+    <body name="shelf_a" pos="0 3.6 0">
+      <geom name="shelf_a_back" type="box" pos="0 0.19 0.425" size="0.65 0.01 0.425" rgba="0.55 0.38 0.25 1" contype="1" conaffinity="1" />
+      <geom name="shelf_a_left" type="box" pos="-0.64 0 0.425" size="0.01 0.2 0.425" rgba="0.55 0.38 0.25 1" contype="1" conaffinity="1" />
+      <geom name="shelf_a_right" type="box" pos="0.64 0 0.425" size="0.01 0.2 0.425" rgba="0.55 0.38 0.25 1" contype="1" conaffinity="1" />
+      <geom name="shelf_a_bottom" type="box" pos="0 0 0.01" size="0.65 0.2 0.01" rgba="0.55 0.38 0.25 1" contype="1" conaffinity="1" />
+      <geom name="shelf_a_top" type="box" pos="0 0 0.84" size="0.65 0.2 0.01" rgba="0.55 0.38 0.25 1" contype="1" conaffinity="1" />
+      <geom name="shelf_a_mid_shelf" type="box" pos="0 0 0.48" size="0.63 0.18 0.01" rgba="0.55 0.38 0.25 1" contype="1" conaffinity="1" />
+      <geom name="shelf_a_div_l" type="box" pos="-0.216666667 0 0.425" size="0.01 0.18 0.405" rgba="0.55 0.38 0.25 1" contype="1" conaffinity="1" />
+      <geom name="shelf_a_div_r" type="box" pos="0.216666667 0 0.425" size="0.01 0.18 0.405" rgba="0.55 0.38 0.25 1" contype="1" conaffinity="1" />
+    </body>
+    <body name="book_machine_learning" pos="0.00557707194 1.48100043 0.666" quat="0.999229237 0 0 -0.0392547027">
+      <freejoint name="book_machine_learning_freejoint" />
+      <geom name="book_machine_learning_geom" type="box" pos="0 0 0" size="0.075 0.015 0.115" rgba="0.85 0.15 0.15 1" contype="1" conaffinity="1" friction="1.2 0.01 0.001" mass="0.4" />
+    </body>
+    <body name="book_robotics_intro" pos="-2.38607157 1.80945885 0.666" quat="0.999524489 0 0 0.03083499">
+      <freejoint name="book_robotics_intro_freejoint" />
+      <geom name="book_robotics_intro_geom" type="box" pos="0 0 0" size="0.075 0.015 0.115" rgba="0.15 0.25 0.85 1" contype="1" conaffinity="1" friction="1.2 0.01 0.001" mass="0.4" />
+    </body>
+    <body name="book_algorithms" pos="-2.00931282 1.78347755 0.666" quat="0.999907151 0 0 -0.0136267914">
+      <freejoint name="book_algorithms_freejoint" />
+      <geom name="book_algorithms_geom" type="box" pos="0 0 0" size="0.075 0.015 0.115" rgba="0.15 0.75 0.25 1" contype="1" conaffinity="1" friction="1.2 0.01 0.001" mass="0.4" />
+    </body>
+    <body name="book_ai_foundations" pos="2.18119189 1.78874552 0.666" quat="0.999999563 0 0 0.000934673962">
+      <freejoint name="book_ai_foundations_freejoint" />
+      <geom name="book_ai_foundations_geom" type="box" pos="0 0 0" size="0.075 0.015 0.115" rgba="0.9 0.55 0.1 1" contype="1" conaffinity="1" friction="1.2 0.01 0.001" mass="0.4" />
+    </body>
+    <body name="book_computer_vision" pos="-2.21893856 -1.51204649 0.666" quat="0.999657853 0 0 0.0261567858">
+      <freejoint name="book_computer_vision_freejoint" />
+      <geom name="book_computer_vision_geom" type="box" pos="0 0 0" size="0.075 0.015 0.115" rgba="0.65 0.15 0.75 1" contype="1" conaffinity="1" friction="1.2 0.01 0.001" mass="0.4" />
+    </body>
+    <body name="book_data_structures" pos="0.00179765922 -1.51118238 0.666" quat="0.999878637 0 0 0.0155791707">
+      <freejoint name="book_data_structures_freejoint" />
+      <geom name="book_data_structures_geom" type="box" pos="0 0 0" size="0.075 0.015 0.115" rgba="0.1 0.7 0.75 1" contype="1" conaffinity="1" friction="1.2 0.01 0.001" mass="0.4" />
+    </body>
+    <body name="book_control_systems" pos="2.21237722 -1.51974005 0.666" quat="0.998575865 0 0 0.0533501882">
+      <freejoint name="book_control_systems_freejoint" />
+      <geom name="book_control_systems_geom" type="box" pos="0 0 0" size="0.075 0.015 0.115" rgba="0.85 0.85 0.15 1" contype="1" conaffinity="1" friction="1.2 0.01 0.001" mass="0.4" />
+    </body>
+    <body name="book_reinforcement_learning" pos="-0.4 3.58 0.236" quat="1.0 0.0 0.0 0.0">
+      <freejoint name="book_reinforcement_learning_freejoint" />
+      <geom name="book_reinforcement_learning_geom" type="box" pos="0 0 0" size="0.075 0.015 0.115" rgba="0.15 0.5 0.3 1" contype="1" conaffinity="1" friction="1.2 0.01 0.001" mass="0.4" />
+    </body>
+    <body name="book_deep_learning" pos="0 3.58 0.236" quat="1.0 0.0 0.0 0.0">
+      <freejoint name="book_deep_learning_freejoint" />
+      <geom name="book_deep_learning_geom" type="box" pos="0 0 0" size="0.075 0.015 0.115" rgba="0.8 0.15 0.45 1" contype="1" conaffinity="1" friction="1.2 0.01 0.001" mass="0.4" />
+    </body>
+    <body name="book_probability" pos="-0.4 3.58 0.596" quat="1.0 0.0 0.0 0.0">
+      <freejoint name="book_probability_freejoint" />
+      <geom name="book_probability_geom" type="box" pos="0 0 0" size="0.075 0.015 0.115" rgba="0.25 0.25 0.7 1" contype="1" conaffinity="1" friction="1.2 0.01 0.001" mass="0.4" />
+    </body>
+    <body name="book_linear_algebra" pos="0 3.58 0.596" quat="1.0 0.0 0.0 0.0">
+      <freejoint name="book_linear_algebra_freejoint" />
+      <geom name="book_linear_algebra_geom" type="box" pos="0 0 0" size="0.075 0.015 0.115" rgba="0.55 0.35 0.2 1" contype="1" conaffinity="1" friction="1.2 0.01 0.001" mass="0.4" />
+    </body>
+    <body name="book_natural_language" pos="0.4 3.58 0.596" quat="1.0 0.0 0.0 0.0">
+      <freejoint name="book_natural_language_freejoint" />
+      <geom name="book_natural_language_geom" type="box" pos="0 0 0" size="0.075 0.015 0.115" rgba="0.2 0.6 0.7 1" contype="1" conaffinity="1" friction="1.2 0.01 0.001" mass="0.4" />
+    </body>
+  </worldbody>
+</mujoco>
