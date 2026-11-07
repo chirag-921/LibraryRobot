@@ -1,7 +1,0 @@
-pyproject.toml
-src/library_robot/__init__.py
-src/library_robot.egg-info/PKG-INFO
-src/library_robot.egg-info/SOURCES.txt
-src/library_robot.egg-info/dependency_links.txt
-src/library_robot.egg-info/requires.txt
-src/library_robot.egg-info/top_level.txt
