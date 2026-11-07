@@ -15,7 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_wheeled_base_physics_validation():
-    """Runs the full headless wheeled base validation suite (Script 13)."""
+    """Runs the full headless wheeled base validation and stress suite (Script 13)."""
     script_path = REPO_ROOT / "scripts" / "13_validate_wheeled_base.py"
     assert script_path.exists(), f"Missing script: {script_path}"
 
@@ -30,7 +30,8 @@ def test_wheeled_base_physics_validation():
     assert "[PASS] Motor Direction Test" in result.stdout
     assert "[PASS] Straight Drive Test" in result.stdout
     assert "[PASS] In-Place Turn Test" in result.stdout
-    assert "[PASS] Tip & Stability Test" in result.stdout
+    assert "[PASS] Baseline Tip & Stability Test" in result.stdout
+    assert "[PASS] Dynamic Stress Tip Test" in result.stdout
 
     # Verify result files were generated
     json_path = REPO_ROOT / "results" / "wheeled_base_validation.json"

@@ -1,10 +1,16 @@
 """Headless validation suite for the wheeled mobile base in MuJoCo.
 
-Executes four physical tests on the wheeled mobile robot:
-  1. Motor Direction Test (forward drive and turning sign conventions)
-  2. Straight-Line Open-Loop Drive Test (distance, lateral drift, heading drift)
-  3. In-Place Open-Loop Turn Test (yaw rate, turn angle, position drift)
-  4. Tip & Stability Test (extended arm + 0.5 kg payload under accel/brake/turn)
+Executes five physical tests on the wheeled mobile robot:
+  1. Test A: Motor Direction Test (forward drive and turning sign conventions)
+  2. Test B: Straight-Line Open-Loop Drive Test (distance, lateral drift, heading drift)
+  3. Test C: In-Place Open-Loop Turn Test (yaw rate, turn angle, position drift)
+  4. Test D: Tip & Baseline Stability Test (extended arm + 0.5 kg payload)
+  5. Test E: Dynamic Stress Tip Test (sweeping arm + 2.0 kg payload, max speed & brake)
+
+Calculates:
+  - Minimum tip margin to support polygon boundaries (retracted vs. extended)
+  - Peak wheel motor torque against forcerange limit
+  - Peak acceleration achieved
 
 Saves results to:
   - results/wheeled_base_validation.json
@@ -103,6 +109,44 @@ def settle_robot(model: mujoco.MjModel, data: mujoco.MjData, duration_s: float =
     steps = max(1, int(duration_s / model.opt.timestep))
     for _ in range(steps):
         mujoco.mj_step(model, data)
+
+
+def compute_tip_margin(model: mujoco.MjModel, data: mujoco.MjData) -> Dict[str, float]:
+    """
+    Computes horizontal distance from combined robot CoM to the edges of the
+    support polygon defined by the two drive wheels (y = +/-0.31) and two casters (x = +/-0.24).
+    """
+    chassis_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "mobile_chassis")
+    world_com = data.subtree_com[chassis_id].copy()
+    chassis_pos = data.xpos[chassis_id].copy()
+    chassis_mat = data.xmat[chassis_id].reshape(3, 3)
+
+    # CoM in chassis body frame
+    com_chassis = chassis_mat.T @ (world_com - chassis_pos)
+    x_c, y_c = float(com_chassis[0]), float(com_chassis[1])
+
+    # Diamond support polygon: front/rear casters at x = +/-0.24, wheels at y = +/-0.31
+    caster_x = 0.24  # m; needs tuning
+    wheel_y = 0.31   # m; needs tuning
+    normalizer = math.hypot(1.0 / caster_x, 1.0 / wheel_y)
+
+    d_fl = (1.0 - (x_c / caster_x + y_c / wheel_y)) / normalizer
+    d_fr = (1.0 - (x_c / caster_x - y_c / wheel_y)) / normalizer
+    d_rl = (1.0 - (-x_c / caster_x + y_c / wheel_y)) / normalizer
+    d_rr = (1.0 - (-x_c / caster_x - y_c / wheel_y)) / normalizer
+
+    min_margin = min(d_fl, d_fr, d_rl, d_rr)
+
+    return {
+        "com_x_m": x_c,
+        "com_y_m": y_c,
+        "com_z_m": float(com_chassis[2]),
+        "dist_front_left_m": d_fl,
+        "dist_front_right_m": d_fr,
+        "dist_rear_left_m": d_rl,
+        "dist_rear_right_m": d_rr,
+        "min_tip_margin_m": min_margin,
+    }
 
 
 # ==============================================================================
@@ -260,11 +304,11 @@ def test_inplace_turn() -> Dict[str, Any]:
 
 
 # ==============================================================================
-# TEST D: TIP AND DYNAMIC STABILITY TEST
+# TEST D: TIP AND BASELINE STABILITY TEST (0.5 kg payload)
 # ==============================================================================
 
 def test_tip_and_stability() -> Dict[str, Any]:
-    print("\n--- Test D: Tip & Stability Test ---")
+    print("\n--- Test D: Baseline Tip & Stability Test (0.5 kg) ---")
     model, data, left_act, right_act, left_wheel_geom, right_wheel_geom, ground_geom = setup_fresh_model()
 
     payload_mass = get_cfg("tip_test", "payload_mass_kg", 0.50)
@@ -302,7 +346,6 @@ def test_tip_and_stability() -> Dict[str, Any]:
     mujoco.mj_forward(model, data)
     settle_robot(model, data, 0.10)
 
-    # Hand position debug
     chassis_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "mobile_chassis")
     hand_reach = data.xpos[hand_id] - data.xpos[chassis_id]
     print(f"  Extended arm reach relative to chassis: X={hand_reach[0]:.3f} m, Z={hand_reach[2]:.3f} m")
@@ -320,35 +363,33 @@ def test_tip_and_stability() -> Dict[str, Any]:
         max_roll = max(max_roll, abs(roll))
         max_pitch = max(max_pitch, abs(pitch))
 
-        # Check for catastrophic flip (pitch or roll > 70 degrees / 1.2 rad)
         if abs(roll) > 1.2 or abs(pitch) > 1.2:
             flipped = True
 
-        # Check wheel ground contact
         left_contact = check_wheel_contact(model, data, left_wheel_geom, ground_geom)
         right_contact = check_wheel_contact(model, data, right_wheel_geom, ground_geom)
         if not (left_contact and right_contact):
             all_contacts_maintained = False
 
-    # 1. Drive forward aggressively
+    # 1. Forward drive
     data.ctrl[left_act] = drive_speed
     data.ctrl[right_act] = drive_speed
     for _ in range(int(drive_duration_s / model.opt.timestep)):
         monitor_step()
 
-    # 2. Aggressive brake
+    # 2. Brake
     data.ctrl[left_act] = 0.0
     data.ctrl[right_act] = 0.0
     for _ in range(int(brake_duration_s / model.opt.timestep)):
         monitor_step()
 
-    # 3. Aggressive in-place turn
+    # 3. Turn
     data.ctrl[left_act] = -turn_speed
     data.ctrl[right_act] = +turn_speed
     for _ in range(int(turn_duration_s / model.opt.timestep)):
         monitor_step()
 
-    # 4. Final brake / settle
+    # 4. Settle
     data.ctrl[left_act] = 0.0
     data.ctrl[right_act] = 0.0
     for _ in range(int(post_brake_duration_s / model.opt.timestep)):
@@ -366,7 +407,7 @@ def test_tip_and_stability() -> Dict[str, Any]:
     print(f"  Max pitch recorded: {max_pitch:.6f} rad ({math.degrees(max_pitch):.3f} deg) (threshold: <= {max_pitch_thresh:.4f} rad)")
     print(f"  Chassis flipped:    {flipped}")
     print(f"  Wheel floor contact: {'Maintained throughout' if all_contacts_maintained else 'Contact interrupted'}")
-    print(f"[{status}] Tip & Stability Test")
+    print(f"[{status}] Baseline Tip & Stability Test")
 
     return {
         "test": "tip_and_stability",
@@ -379,16 +420,204 @@ def test_tip_and_stability() -> Dict[str, Any]:
     }
 
 
+# ==============================================================================
+# TEST E: DYNAMIC STRESS TIP TEST (2.0 kg moving payload + max velocity/brake/turn)
+# ==============================================================================
+
+def test_stress_tip_test() -> Dict[str, Any]:
+    print("\n--- Test E: Dynamic Stress Tip Test (2.0 kg Moving Payload) ---")
+    model, data, left_act, right_act, left_wheel_geom, right_wheel_geom, ground_geom = setup_fresh_model()
+    left_wheel_body = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "left_wheel")
+    right_wheel_body = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "right_wheel")
+
+    payload_mass = get_cfg("stress_tip_test", "payload_mass_kg", 2.00)
+    sweep_freq_hz = get_cfg("stress_tip_test", "arm_sweep_freq_hz", 1.0)
+    drive_speed = get_cfg("stress_tip_test", "max_drive_speed", 8.0)
+    turn_speed = get_cfg("stress_tip_test", "max_turn_speed", 8.0)
+    drive_duration_s = get_cfg("stress_tip_test", "drive_duration_s", 1.0)
+    brake_duration_s = get_cfg("stress_tip_test", "brake_duration_s", 0.5)
+    turn_duration_s = get_cfg("stress_tip_test", "turn_duration_s", 1.0)
+    post_brake_duration_s = get_cfg("stress_tip_test", "post_turn_brake_duration_s", 0.5)
+    max_pitch_thresh = get_cfg("stress_tip_test", "max_pitch_rad", 0.05)
+    max_roll_thresh = get_cfg("stress_tip_test", "max_roll_rad", 0.05)
+    max_lift_thresh = get_cfg("stress_tip_test", "max_wheel_lift_m", 0.002)
+
+    # Attach 2.0 kg payload to hand body
+    hand_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "hand")
+    model.body_mass[hand_id] += payload_mass
+    mujoco.mj_setConst(model, data)
+
+    # Initial fully extended pose
+    extended_joints = {
+        "joint1": 0.0,
+        "joint2": 0.85,
+        "joint3": 0.0,
+        "joint4": -0.30,
+        "joint5": 0.0,
+        "joint6": 1.05,
+        "joint7": 0.0,
+    }
+    for j_name, target_pos in extended_joints.items():
+        j_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, j_name)
+        if j_id >= 0:
+            data.qpos[model.jnt_qposadr[j_id]] = target_pos
+            act_num = j_name.replace("joint", "")
+            act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, f"actuator{act_num}")
+            if act_id >= 0:
+                data.ctrl[act_id] = target_pos
+
+    mujoco.mj_forward(model, data)
+    settle_robot(model, data, 0.10)
+
+    chassis_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "mobile_chassis")
+    hand_reach = data.xpos[hand_id] - data.xpos[chassis_id]
+    print(f"  Fully extended reach: X={hand_reach[0]:.3f} m, Z={hand_reach[2]:.3f} m")
+    print(f"  Payload mass attached: {payload_mass:.2f} kg (upper-bound stress)")
+
+    max_roll = 0.0
+    max_pitch = 0.0
+    peak_wheel_torque = 0.0
+    peak_accel = 0.0
+    max_wheel_lift = 0.0
+    all_contacts = True
+    flipped = False
+
+    dt = model.opt.timestep
+    prev_vel = data.qvel[:2].copy()
+    nominal_wheel_z = 0.1000  # radius = 0.10m, nominal center height
+
+    def monitor_stress_step(sim_time: float, u_left: float, u_right: float):
+        nonlocal max_roll, max_pitch, peak_wheel_torque, peak_accel, max_wheel_lift, all_contacts, flipped, prev_vel
+
+        # Arm sweeps dynamically between -0.5 rad (left) and +0.5 rad (right)
+        joint1_cmd = 0.50 * math.sin(2.0 * math.pi * sweep_freq_hz * sim_time)
+        data.ctrl[0] = joint1_cmd
+        data.ctrl[left_act] = u_left
+        data.ctrl[right_act] = u_right
+
+        mujoco.mj_step(model, data)
+
+        # Base orientation
+        _, (roll, pitch, _) = get_base_pose(data)
+        max_roll = max(max_roll, abs(roll))
+        max_pitch = max(max_pitch, abs(pitch))
+        if abs(roll) > 1.2 or abs(pitch) > 1.2:
+            flipped = True
+
+        # Wheel torque (actuator forces)
+        t_l = abs(float(data.actuator_force[left_act]))
+        t_r = abs(float(data.actuator_force[right_act]))
+        peak_wheel_torque = max(peak_wheel_torque, t_l, t_r)
+
+        # Acceleration
+        curr_vel = data.qvel[:2].copy()
+        accel = math.hypot((curr_vel[0] - prev_vel[0]) / dt, (curr_vel[1] - prev_vel[1]) / dt)
+        peak_accel = max(peak_accel, accel)
+        prev_vel = curr_vel
+
+        # Vertical lift above nominal ground center
+        lz = float(data.xpos[left_wheel_body][2])
+        rz = float(data.xpos[right_wheel_body][2])
+        lift_l = max(0.0, lz - nominal_wheel_z)
+        lift_r = max(0.0, rz - nominal_wheel_z)
+        max_wheel_lift = max(max_wheel_lift, lift_l, lift_r)
+
+        l_contact = check_wheel_contact(model, data, left_wheel_geom, ground_geom)
+        r_contact = check_wheel_contact(model, data, right_wheel_geom, ground_geom)
+        if not (l_contact and r_contact):
+            all_contacts = False
+
+    sim_t = 0.0
+    # 1. Accelerate forward at max configured wheel speed (8.0 rad/s)
+    for _ in range(int(drive_duration_s / dt)):
+        sim_t += dt
+        monitor_stress_step(sim_t, drive_speed, drive_speed)
+
+    # 2. Hard brake (0.0 rad/s)
+    for _ in range(int(brake_duration_s / dt)):
+        sim_t += dt
+        monitor_stress_step(sim_t, 0.0, 0.0)
+
+    # 3. Aggressive in-place turn at max yaw rate (-8.0, +8.0 rad/s)
+    for _ in range(int(turn_duration_s / dt)):
+        sim_t += dt
+        monitor_stress_step(sim_t, -turn_speed, turn_speed)
+
+    # 4. Final hard brake
+    for _ in range(int(post_brake_duration_s / dt)):
+        sim_t += dt
+        monitor_stress_step(sim_t, 0.0, 0.0)
+
+    motor_torque_limit = float(model.actuator_forcerange[left_act][1])
+    torque_saturation_pct = (peak_wheel_torque / motor_torque_limit) * 100.0
+
+    passed = bool(
+        not flipped
+        and max_roll <= max_roll_thresh
+        and max_pitch <= max_pitch_thresh
+        and max_wheel_lift <= max_lift_thresh
+    )
+    status = "PASS" if passed else "FAIL"
+
+    print(f"  Max roll recorded:       {max_roll:.6f} rad ({math.degrees(max_roll):.4f} deg) (threshold: <= {max_roll_thresh:.4f} rad)")
+    print(f"  Max pitch recorded:      {max_pitch:.6f} rad ({math.degrees(max_pitch):.4f} deg) (threshold: <= {max_pitch_thresh:.4f} rad)")
+    print(f"  Peak wheel torque:       {peak_wheel_torque:.4f} N*m / {motor_torque_limit:.1f} N*m limit ({torque_saturation_pct:.1f}% saturation)")
+    print(f"  Peak horizontal accel:   {peak_accel:.4f} m/s^2")
+    print(f"  Max wheel vertical lift: {max_wheel_lift * 1000.0:.3f} mm (threshold: <= {max_lift_thresh * 1000.0:.1f} mm)")
+    print(f"  Chassis flipped:         {flipped}")
+    print(f"[{status}] Dynamic Stress Tip Test")
+
+    return {
+        "test": "stress_tip_test",
+        "passed": passed,
+        "payload_mass_kg": float(payload_mass),
+        "max_roll_rad": float(max_roll),
+        "max_pitch_rad": float(max_pitch),
+        "peak_wheel_torque_nm": float(peak_wheel_torque),
+        "motor_torque_limit_nm": float(motor_torque_limit),
+        "peak_accel_mps2": float(peak_accel),
+        "max_wheel_lift_mm": float(max_wheel_lift * 1000.0),
+        "flipped": flipped,
+    }
+
+
 def main():
-    print("=" * 60)
-    print("PHASE 3: WHEELED BASE PHYSICAL VALIDATION SUITE")
-    print("=" * 60)
+    print("=" * 65)
+    print("PHASE 3: WHEELED BASE PHYSICAL VALIDATION & STRESS SUITE")
+    print("=" * 65)
+
+    # 1. Tip margin analysis
+    print("\n--- Static Centre of Mass & Tip Margin Analysis ---")
+    m_base, d_base, _, _, _, _, _ = setup_fresh_model()
+    settle_robot(m_base, d_base, 0.10)
+    margin_retracted = compute_tip_margin(m_base, d_base)
+    print(f"  Retracted Arm (Panda Home, 0 kg payload):")
+    print(f"    Combined CoM in chassis frame: X={margin_retracted['com_x_m']:.4f} m, Y={margin_retracted['com_y_m']:.4f} m, Z={margin_retracted['com_z_m']:.4f} m")
+    print(f"    Distance to Front-Left / Front-Right edges: {margin_retracted['dist_front_left_m']:.4f} m / {margin_retracted['dist_front_right_m']:.4f} m")
+    print(f"    Minimum Tip Margin to Polygon Edge:        {margin_retracted['min_tip_margin_m']:.4f} m ({margin_retracted['min_tip_margin_m'] * 100.0:.2f} cm)")
+
+    m_ext, d_ext, _, _, _, _, _ = setup_fresh_model()
+    hand_id = mujoco.mj_name2id(m_ext, mujoco.mjtObj.mjOBJ_BODY, "hand")
+    m_ext.body_mass[hand_id] += 2.0  # 2 kg payload
+    mujoco.mj_setConst(m_ext, d_ext)
+    extended_joints = {"joint1": 0.0, "joint2": 0.85, "joint3": 0.0, "joint4": -0.30, "joint5": 0.0, "joint6": 1.05, "joint7": 0.0}
+    for j_name, target_pos in extended_joints.items():
+        j_id = mujoco.mj_name2id(m_ext, mujoco.mjtObj.mjOBJ_JOINT, j_name)
+        d_ext.qpos[m_ext.jnt_qposadr[j_id]] = target_pos
+    mujoco.mj_forward(m_ext, d_ext)
+    settle_robot(m_ext, d_ext, 0.10)
+    margin_extended = compute_tip_margin(m_ext, d_ext)
+    print(f"  Fully Extended Arm + 2.0 kg Payload:")
+    print(f"    Combined CoM in chassis frame: X={margin_extended['com_x_m']:.4f} m, Y={margin_extended['com_y_m']:.4f} m, Z={margin_extended['com_z_m']:.4f} m")
+    print(f"    Distance to Front-Left / Front-Right edges: {margin_extended['dist_front_left_m']:.4f} m / {margin_extended['dist_front_right_m']:.4f} m")
+    print(f"    Minimum Tip Margin to Polygon Edge:        {margin_extended['min_tip_margin_m']:.4f} m ({margin_extended['min_tip_margin_m'] * 100.0:.2f} cm)")
 
     results = [
         test_motor_direction(),
         test_straight_drive(),
         test_inplace_turn(),
         test_tip_and_stability(),
+        test_stress_tip_test(),
     ]
 
     all_passed = all(r["passed"] for r in results)
@@ -398,7 +627,16 @@ def main():
     results_dir.mkdir(parents=True, exist_ok=True)
     json_path = results_dir / "wheeled_base_validation.json"
     with json_path.open("w", encoding="utf-8") as f:
-        json.dump({"overall_pass": all_passed, "tests": results}, f, indent=2)
+        json.dump(
+            {
+                "overall_pass": all_passed,
+                "tip_margin_retracted_m": margin_retracted["min_tip_margin_m"],
+                "tip_margin_extended_2kg_m": margin_extended["min_tip_margin_m"],
+                "tests": results,
+            },
+            f,
+            indent=2,
+        )
 
     # Save CSV results
     csv_path = results_dir / "wheeled_base_validation.csv"
@@ -415,9 +653,12 @@ def main():
     logs_dir.mkdir(parents=True, exist_ok=True)
     log_path = logs_dir / "wheeled_base_validation.txt"
     with log_path.open("w", encoding="utf-8") as f:
-        f.write("PHASE 3: WHEELED BASE PHYSICAL VALIDATION SUMMARY\n")
-        f.write("=" * 60 + "\n")
+        f.write("PHASE 3: WHEELED BASE PHYSICAL VALIDATION & STRESS SUMMARY\n")
+        f.write("=" * 65 + "\n")
         f.write(f"Overall Status: {'PASS' if all_passed else 'FAIL'}\n\n")
+        f.write("TIP MARGIN TO SUPPORT POLYGON:\n")
+        f.write(f"  - Retracted arm (0 kg):        {margin_retracted['min_tip_margin_m'] * 100.0:.2f} cm\n")
+        f.write(f"  - Fully extended arm (2.0 kg): {margin_extended['min_tip_margin_m'] * 100.0:.2f} cm\n\n")
         for r in results:
             status = "PASS" if r["passed"] else "FAIL"
             f.write(f"[{status}] {r['test']}\n")
@@ -426,13 +667,13 @@ def main():
                     f.write(f"    {k}: {v}\n")
             f.write("\n")
 
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 65)
     print(f"OVERALL VALIDATION RESULT: {'ALL PASS' if all_passed else 'ONE OR MORE FAILED'}")
     print(f"Results saved to:")
     print(f"  - {json_path}")
     print(f"  - {csv_path}")
     print(f"  - {log_path}")
-    print("=" * 60)
+    print("=" * 65)
 
     if not all_passed:
         exit(1)
