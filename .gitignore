@@ -2,3 +2,4 @@
 __pycache__/
 *.pyc
 assets/mujoco_menagerie/
+LibraryRobot/assets/mujoco_menagerie/
