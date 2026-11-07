@@ -1,0 +1,193 @@
+# Library environment layout configuration for Autonomous Mobile Librarian Robot.
+# Used by both simulation scene generation and high-level task planners.
+# All coordinates are in metres (SI units), angles in radians.
+
+seed: 42
+clearance_mm: 25.0  # nominal gap between book spines in shelf compartments; needs tuning
+
+room:
+  size: [8.0, 8.0, 2.5]  # length (X), width (Y), wall height (Z) in metres
+  wall_thickness: 0.10   # m
+  floor_friction: [1.0, 0.01, 0.001]  # sliding, torsional, rolling friction; matches configs/robot.yaml
+
+landmarks:
+  window:
+    pos: [3.95, 3.65, 1.60]  # East wall, near Shelf A compartment A3 (visual only)
+    size: [0.05, 1.20, 0.80]
+  charging_dock:
+    pos: [-1.0, -3.0, 0.0]
+    near_table: "Table D"
+
+robot_start:
+  x: -1.0
+  y: -3.0
+  yaw: 1.570796  # facing +Y (North into the library)
+  location_name: "charging_dock"
+
+tables:
+  - name: "Table A"
+    pos: [-2.2, 1.8, 0.0]
+    yaw: 0.0
+    size: [1.0, 0.40, 0.55]  # length (X), depth (Y), top surface height (Z); depth 0.4m ensures reachability
+  - name: "Table B"
+    pos: [0.0, 1.5, 0.0]
+    yaw: 0.0
+    size: [1.0, 0.40, 0.55]
+  - name: "Table C"
+    pos: [2.2, 1.8, 0.0]
+    yaw: 0.0
+    size: [1.0, 0.40, 0.55]
+  - name: "Table D"
+    pos: [-2.2, -1.5, 0.0]
+    yaw: 0.0
+    size: [1.0, 0.40, 0.55]
+  - name: "Table E"
+    pos: [0.0, -1.5, 0.0]
+    yaw: 0.0
+    size: [1.0, 0.40, 0.55]
+  - name: "Table F"
+    pos: [2.2, -1.5, 0.0]
+    yaw: 0.0
+    size: [1.0, 0.40, 0.55]
+
+shelf:
+  name: "Shelf A"
+  pos: [0.0, 3.60, 0.0]  # against North wall, facing -Y (South)
+  yaw: 0.0               # opening faces south (towards y = 0)
+  size: [1.30, 0.40, 0.85]  # outer width (X), depth (Y), height (Z)
+  board_thickness: 0.02   # m
+  rows: 2
+  columns: 3
+  # Compartment inner dimensions: width 0.38 m, depth 0.36 m, height 0.32 m
+  # Row 1 (bottom): lower surface z = 0.12 m
+  # Row 2 (top):    upper surface z = 0.48 m
+  compartments:
+    - id: "A1"
+      row: 1
+      col: 1
+      relative_center: [-0.40, 0.0, 0.28]
+      surface_z: 0.12
+    - id: "A2"
+      row: 1
+      col: 2
+      relative_center: [0.0, 0.0, 0.28]
+      surface_z: 0.12
+    - id: "A3"
+      row: 1
+      col: 3
+      relative_center: [0.40, 0.0, 0.28]
+      surface_z: 0.12  # EMPTY: closest empty compartment to the East window
+    - id: "A4"
+      row: 2
+      col: 1
+      relative_center: [-0.40, 0.0, 0.64]
+      surface_z: 0.48
+    - id: "A5"
+      row: 2
+      col: 2
+      relative_center: [0.0, 0.0, 0.64]
+      surface_z: 0.48
+    - id: "A6"
+      row: 2
+      col: 3
+      relative_center: [0.40, 0.0, 0.64]
+      surface_z: 0.48
+
+books:
+  - name: "book_machine_learning"
+    title: "Machine Learning"
+    location: "Table B"
+    slot_index: 0
+    size: [0.15, 0.03, 0.23]  # depth/width across spine, thickness, height
+    mass: 0.40                 # kg; needs tuning
+    colour: [0.85, 0.15, 0.15, 1.0]  # Red
+    orientation: "upright"
+  - name: "book_robotics_intro"
+    title: "Introduction to Robotics"
+    location: "Table A"
+    slot_index: 0
+    size: [0.15, 0.03, 0.23]
+    mass: 0.40
+    colour: [0.15, 0.25, 0.85, 1.0]  # Blue
+    orientation: "upright"
+  - name: "book_algorithms"
+    title: "Algorithms and Data"
+    location: "Table A"
+    slot_index: 1
+    size: [0.15, 0.03, 0.23]
+    mass: 0.40
+    colour: [0.15, 0.75, 0.25, 1.0]  # Green
+    orientation: "upright"
+  - name: "book_ai_foundations"
+    title: "AI Foundations"
+    location: "Table C"
+    slot_index: 0
+    size: [0.15, 0.03, 0.23]
+    mass: 0.40
+    colour: [0.90, 0.55, 0.10, 1.0]  # Orange
+    orientation: "upright"
+  - name: "book_computer_vision"
+    title: "Computer Vision"
+    location: "Table D"
+    slot_index: 0
+    size: [0.15, 0.03, 0.23]
+    mass: 0.40
+    colour: [0.65, 0.15, 0.75, 1.0]  # Purple
+    orientation: "upright"
+  - name: "book_data_structures"
+    title: "Data Structures in C++"
+    location: "Table E"
+    slot_index: 0
+    size: [0.15, 0.03, 0.23]
+    mass: 0.40
+    colour: [0.10, 0.70, 0.75, 1.0]  # Cyan
+    orientation: "upright"
+  - name: "book_control_systems"
+    title: "Feedback Control"
+    location: "Table F"
+    slot_index: 0
+    size: [0.15, 0.03, 0.23]
+    mass: 0.40
+    colour: [0.85, 0.85, 0.15, 1.0]  # Yellow
+    orientation: "upright"
+  - name: "book_reinforcement_learning"
+    title: "Reinforcement Learning"
+    location: "A1"
+    slot_index: 0
+    size: [0.15, 0.03, 0.23]
+    mass: 0.40
+    colour: [0.15, 0.50, 0.30, 1.0]  # Dark Green
+    orientation: "upright"
+  - name: "book_deep_learning"
+    title: "Deep Learning"
+    location: "A2"
+    slot_index: 0
+    size: [0.15, 0.03, 0.23]
+    mass: 0.40
+    colour: [0.80, 0.15, 0.45, 1.0]  # Magenta
+    orientation: "upright"
+  # Note: Compartment A3 intentionally left EMPTY
+  - name: "book_probability"
+    title: "Probability and Statistics"
+    location: "A4"
+    slot_index: 0
+    size: [0.15, 0.03, 0.23]
+    mass: 0.40
+    colour: [0.25, 0.25, 0.70, 1.0]  # Navy
+    orientation: "upright"
+  - name: "book_linear_algebra"
+    title: "Linear Algebra Done Right"
+    location: "A5"
+    slot_index: 0
+    size: [0.15, 0.03, 0.23]
+    mass: 0.40
+    colour: [0.55, 0.35, 0.20, 1.0]  # Brown
+    orientation: "upright"
+  - name: "book_natural_language"
+    title: "Natural Language Processing"
+    location: "A6"
+    slot_index: 0
+    size: [0.15, 0.03, 0.23]
+    mass: 0.40
+    colour: [0.20, 0.60, 0.70, 1.0]  # Teal
+    orientation: "upright"
