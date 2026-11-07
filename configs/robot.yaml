@@ -23,12 +23,25 @@ panda_home:
   finger_positions: [0.04, 0.04]
   gripper_actuator_command: 255.0
 
+panda_tucked:
+  # Arm folded close to base during driving to minimize tip risk and footprint
+  arm_joints:
+    joint1: 0.0
+    joint2: -0.785398  # rad; tucked backward; needs tuning
+    joint3: 0.0
+    joint4: -2.356194  # rad; folded elbow; needs tuning
+    joint5: 0.0
+    joint6: 1.570796   # rad; wrist level; needs tuning
+    joint7: 0.785398   # rad; needs tuning
+  finger_positions: [0.0, 0.0]
+  gripper_actuator_command: 0.0
+
 base:
   initial_pose_xyyaw: [0.0, 0.0, 0.0]  # needs tuning; metres, metres, radians
   chassis_mass: 40.0  # kg; needs tuning
   chassis_half_size: [0.34, 0.28, 0.10]  # m; needs tuning
   panda_mount_position: [-0.10, 0.0, 0.10]  # m relative to chassis; needs tuning
-  panda_gravity_compensation: 1.0  # needs tuning; 1.0 is full compensation
+  panda_gravity_compensation: 0.0  # 0.0=off (default for physics realism); set to 1.0 to re-enable; needs tuning
 
   wheeled:
     wheel_radius: 0.10       # m; needs tuning
@@ -41,6 +54,10 @@ base:
     wheel_speed_limit: 8.0   # rad/s; needs tuning
     wheel_torque_limit: 5.0  # N*m; needs tuning
     wheel_velocity_gain: 10.0  # needs tuning
+    max_linear_velocity: 0.60   # m/s; needs tuning
+    max_angular_velocity: 0.80  # rad/s; needs tuning
+    max_linear_accel: 0.60      # m/s^2; well below motor saturation; needs tuning
+    max_angular_accel: 0.60     # rad/s^2; well below motor saturation; needs tuning
     caster_radius: 0.05     # m; needs tuning
     caster_mass: 0.30       # kg per caster; needs tuning
     caster_x_offset: 0.24   # m; needs tuning
@@ -66,3 +83,16 @@ base:
 validation:
   simulation_steps: 500  # smoke-test steps; needs tuning
   viewer_sync_period_s: 0.02  # seconds; needs tuning
+  arm_gravcomp: false  # false => remove gravity compensation for validation tests
+
+diff_drive_controller:
+  k_bearing: 2.0        # angular velocity gain towards waypoint bearing; needs tuning
+  k_drive: 0.8          # linear velocity gain proportional to distance; needs tuning
+  k_heading: 1.8        # angular velocity gain to align final heading; needs tuning
+  position_tolerance: 0.02  # metres (2 cm) acceptable radius to waypoint; needs tuning
+  heading_tolerance: 0.0349 # radians (~2.0 deg) acceptable heading error; needs tuning
+  settle_steps: 50      # steps (0.1 s at dt=0.002) to hold position and heading; needs tuning
+  timeout_per_segment_s: 15.0 # seconds before segment is flagged TIMEOUT_FAILED; needs tuning
+  arm_motion_velocity_threshold: 0.05  # rad/s passive deflection threshold; needs tuning
+  dt: 0.002             # seconds controller simulation timestep; needs tuning
+  use_odometry: false   # true => controller uses odometry pose; false => ground truth; needs tuning
